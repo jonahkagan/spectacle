@@ -1,0 +1,10 @@
+*.cmx
+*.cmxa
+*.cma
+*.cmo
+*.a
+*.o
+*.cmi
+obj
+*~
+run
