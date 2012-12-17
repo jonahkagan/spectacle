@@ -1,12 +1,14 @@
 open OUnit
 open Transforms
+open Transforms.Spec
+open Transforms.Ty
 
-let assert_equal_spec = assert_equal ~printer:Spec.pretty
+let assert_equal_ty = assert_equal ~printer:Ty.to_string
 
 let bb_tests =
 "Backbone" >::: [
   "key empty" >:: (fun () ->
-    assert_equal
+    assert_equal_ty
       (transform_bb
         None
         (SObject []))
@@ -19,7 +21,7 @@ let bb_tests =
         ])))
   );
   "key done,title" >:: (fun () ->
-    assert_equal
+    assert_equal_ty
       (transform_bb
         None
         (SObject [
@@ -41,7 +43,7 @@ let bb_tests =
         ])))
   );
   "key _id" >:: (fun () ->
-    assert_equal
+    assert_equal_ty
       (transform_bb
         None
         (SObject [("_id", SNumber)]))
@@ -54,7 +56,7 @@ let bb_tests =
         ])))
   );
   "bb value idAttr present" >:: (fun () ->
-    assert_equal
+    assert_equal_ty
       (transform_bb
         (Some (SObject [("idAttribute", sSingle "_id")]))
         (SObject [("_id", SNumber)]))
@@ -67,7 +69,7 @@ let bb_tests =
         ])))
   );
   "bb value idAttr absent" >:: (fun () ->
-    assert_equal
+    assert_equal_ty
       (transform_bb
         (Some (SObject [("idAttribute", sSingle "_id")]))
         (SObject []))
@@ -82,7 +84,7 @@ let bb_tests =
         ])))
   );
   "bb value idAttr mismatch" >:: (fun () ->
-    assert_equal
+    assert_equal_ty
       (transform_bb
         (Some (SObject [("idAttribute", sSingle "_id")]))
         (SObject [("not_id", SNumber)]))

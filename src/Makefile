@@ -2,8 +2,7 @@
 OCAMLBUILD = ocamlbuild -build-dir ../obj \
 						 -libs unix,oUnit -quiet \
 						 -cflags -I,../lib,-annot \
-						 -lflags -I,../lib \
-						 main.d.byte
+						 -lflags -I,../lib
 
 $(shell mkdir -p ../obj)
 
