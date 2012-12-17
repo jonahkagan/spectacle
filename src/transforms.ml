@@ -1,3 +1,4 @@
+open Prelude
 open List
 open Format
 open FormatExt 
@@ -74,6 +75,17 @@ module Ty = struct
    * will be sorted. *)
   and ty_obj_expr = (field_name * presence * t) list
 
+  let empty_obj = TObject []
+
+  let guard_obj f ty = match ty with
+    | TObject fields -> f fields
+    | _ -> failwith "Expected TObject!"
+
+  let compare_fields = (fun (f1, _, _) (f2, _, _) -> compare f1 f2)
+  let add_field field obj = guard_obj (fun fields ->
+    TObject (merge compare_fields [field] fields)) obj
+  let add_fields fields obj = fold_left (flip add_field) obj fields
+
   let rec ty t = match t with
     | TTop -> text "Top"
     | TString p -> Pat.pat p
@@ -89,12 +101,12 @@ module Ty = struct
             fields))
   let to_string = FormatExt.to_string ty
 
-  let rec ty_of_spec spec = match spec with
+  let rec from_spec spec = match spec with
     | SString p -> TString p
     | SBoolean -> TBoolean
     | SNumber -> TNumber
     | SObject fields ->
-        TObject (map (fun (f, s) -> (f, Present, ty_of_spec s)) fields)
+        TObject (map (fun (f, s) -> (f, Present, from_spec s)) fields)
 end
 open Ty
 
@@ -104,44 +116,46 @@ let tStr = TString Pat.all
 let sSingle s = SString (Pat.singleton s)
 let tSingle s = TString (Pat.singleton s)
 
-let sort_fields = sort (fun (f1, _, _) (f2, _, _) -> compare f1 f2)
-
 let transform_bb (options : Spec.t option) (spec : Spec.t) : Ty.t =
   match spec with
   | SObject fields ->
-    let id_attr_opt = match options with
-      | None -> None
-      | Some options -> begin
-          match lookup_field "idAttribute" options with
-          | Some (SString p) ->
-              if Pat.is_singleton p
-              then Some (Pat.string_of_singleton p)
-              else None
-          | _ -> None
-      end
-    in
-    let out_fields = match id_attr_opt with
-      | None -> [("id", Absent, TTop)]
-      | Some id_attr ->
-          match lookup_field id_attr spec with
-          | None -> [("id", Absent, TTop)] 
-          | Some id_field_spec -> [("id", Present, ty_of_spec id_field_spec)]
-    in
-    let attrs_fields = match id_attr_opt with
-      | None -> []
-      | Some id_attr ->
-          match lookup_field id_attr spec with
-          | Some id_field_spec -> []
-          | None -> [(id_attr, Absent, TTop)]
-    in
-    let attrs = TObject (sort_fields
-      ((map (fun (f, s) -> (f, Present, ty_of_spec s)) fields)
-      @ attrs_fields))
-    in
-    let out_fields =
-      ("attributes", Present, attrs) ::
-      ("cid", Present, tStr) ::
-      out_fields
-    in
-    TArrow ([attrs], TObject (sort_fields out_fields))
+      let id_attr_opt = match options with
+        | None -> None
+        | Some options -> begin
+            match lookup_field "idAttribute" options with
+            | Some (SString p) ->
+                if Pat.is_singleton p
+                then Some (Pat.string_of_singleton p)
+                else failwith "idAttribute given Str"
+            | _ -> None
+        end
+      in
+      let out_ty = Ty.empty_obj in
+      let out_ty = match id_attr_opt with
+        | None -> Ty.add_field ("id", Absent, TTop) out_ty
+        | Some id_attr ->
+            match lookup_field id_attr spec with
+            | None -> Ty.add_field ("id", Absent, TTop) out_ty
+            | Some id_field_spec ->
+                Ty.add_field ("id", Present, Ty.from_spec id_field_spec) out_ty
+      in
+      let attrs_ty = match id_attr_opt with
+        | None -> Ty.empty_obj
+        | Some id_attr ->
+            match lookup_field id_attr spec with
+            | Some id_field_spec -> Ty.empty_obj
+            | None -> Ty.add_field (id_attr, Absent, TTop) Ty.empty_obj
+      in
+      let attrs_ty = 
+        Ty.add_fields
+          (map (fun (f, s) -> (f, Present, Ty.from_spec s)) fields)
+          attrs_ty
+      in
+      let out_ty =
+        Ty.add_fields [
+          ("attributes", Present, attrs_ty);
+          ("cid", Present, tStr)
+        ] out_ty
+      in
+      TArrow ([attrs_ty], out_ty)
   | _ -> failwith "transform_bb expected spec object"
